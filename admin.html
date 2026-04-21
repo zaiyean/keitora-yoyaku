@@ -180,6 +180,7 @@
       <button onclick="nextMonth()">&#9654;</button>
     </div>
 
+    <p id="calHint" style="text-align:center; color:#185FA5; font-size:14px; margin-bottom:8px;">確認したい日を選択してください</p>
     <div class="calendar-grid" id="calendarGrid">
       <div class="day-header sun">日</div>
       <div class="day-header">月</div>
@@ -380,6 +381,7 @@ function renderCalendar() {
 
 function showDetail(dateStr) {
   selectedDate = dateStr;
+  document.getElementById('calHint').style.display = 'none';
   renderCalendar();
 
   var parts = dateStr.split('/');

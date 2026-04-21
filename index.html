@@ -134,19 +134,6 @@
     </div>
   </div>
 
-  <!-- STEP3: パスワード（役員のみ） -->
-  <div id="step3" class="step">
-    <p class="section-title">③ 管理者パスワードを入力してください</p>
-    <div id="pwErrorMsg"></div>
-    <div class="form-group">
-      <label>パスワード（4桁）</label>
-      <input type="password" id="passwordInput" maxlength="4" inputmode="numeric"
-             placeholder="0000" onkeydown="if(event.key==='Enter') doLogin()">
-    </div>
-    <button class="btn-go" onclick="doLogin()" id="btnLogin">管理画面へ進む</button>
-    <br>
-    <button style="width:100%;background:none;border:1px solid #ccc;padding:12px;border-radius:8px;font-size:15px;cursor:pointer;margin-top:10px;min-height:44px;" onclick="goBackRole()">← 役割選択に戻る</button>
-  </div>
 
 </div>
 
@@ -155,7 +142,6 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbykihXW1722uZGZwcWtnROf
 
 var selectedJichikaiId = '';
 var selectedJichikaiName = '';
-var selectedRole = '';
 
 async function callGAS(params) {
   const res = await fetch(GAS_URL, {
@@ -217,57 +203,9 @@ function selectRole(role) {
   document.getElementById('roleAdmin').classList.toggle('selected', role === 'admin');
 
   if (role === 'general') {
-    // 一般会員 → 予約フォームへ
     location.href = 'yoyaku.html?jichikai=' + encodeURIComponent(selectedJichikaiId);
   } else {
-    // 役員 → パスワード入力へ
-    document.getElementById('step3').classList.add('active');
-    document.getElementById('step3').scrollIntoView({ behavior: 'smooth' });
-    document.getElementById('passwordInput').value = '';
-    document.getElementById('pwErrorMsg').innerHTML = '';
-    document.getElementById('passwordInput').focus();
-  }
-}
-
-function goBackRole() {
-  document.getElementById('step3').classList.remove('active');
-  document.getElementById('roleGeneral').classList.remove('selected');
-  document.getElementById('roleAdmin').classList.remove('selected');
-  selectedRole = '';
-}
-
-async function doLogin() {
-  var pw = document.getElementById('passwordInput').value.trim();
-  if (!pw) {
-    document.getElementById('pwErrorMsg').innerHTML = '<div class="msg-error">パスワードを入力してください</div>';
-    return;
-  }
-  if (!/^\d{4}$/.test(pw)) {
-    document.getElementById('pwErrorMsg').innerHTML = '<div class="msg-error">パスワードは数字4桁で入力してください</div>';
-    return;
-  }
-
-  document.getElementById('btnLogin').disabled = true;
-  document.getElementById('btnLogin').textContent = '確認中...';
-
-  try {
-    const result = await callGAS({ action: 'checkPassword', jichikaiId: selectedJichikaiId, password: pw });
-    if (result.success) {
-      sessionStorage.setItem('jichiAuth', JSON.stringify({
-        id: selectedJichikaiId,
-        name: selectedJichikaiName,
-        authenticated: true
-      }));
-      location.href = 'admin.html?jichikai=' + encodeURIComponent(selectedJichikaiId);
-    } else {
-      document.getElementById('pwErrorMsg').innerHTML = '<div class="msg-error">' + (result.error || 'パスワードが違います') + '</div>';
-      document.getElementById('btnLogin').disabled = false;
-      document.getElementById('btnLogin').textContent = '管理画面へ進む';
-    }
-  } catch(e) {
-    document.getElementById('pwErrorMsg').innerHTML = '<div class="msg-error">通信エラーが発生しました。再度お試しください。</div>';
-    document.getElementById('btnLogin').disabled = false;
-    document.getElementById('btnLogin').textContent = '管理画面へ進む';
+    location.href = 'admin.html?jichikai=' + encodeURIComponent(selectedJichikaiId);
   }
 }
 
