@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>軽トラ予約管理</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: sans-serif; background: #f5f5f5; color: #333; }
+
+  .header {
+    background: #185FA5;
+    color: #fff;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header h1 { font-size: 17px; }
+  .btn-add {
+    background: #fff;
+    color: #185FA5;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    font-weight: bold;
+    min-height: 44px;
+  }
+
+  .container { max-width: 480px; margin: 0 auto; padding: 16px; }
+
+  .calendar-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .calendar-nav button {
+    background: none;
+    border: 1px solid #185FA5;
+    color: #185FA5;
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+    min-height: 44px;
+  }
+  .calendar-nav .month-label { font-size: 17px; font-weight: bold; }
+
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: 16px;
+  }
+  .day-header { text-align: center; font-size: 12px; color: #888; padding: 4px 0; }
+  .day-header.sun { color: #e53e3e; }
+  .day-header.sat { color: #3182ce; }
+
+  .cal-day {
+    text-align: center;
+    padding: 6px 2px;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+  }
+  .cal-day.empty { cursor: default; }
+  .cal-day .status-label { font-size: 9px; display: block; border-radius: 3px; padding: 1px 3px; margin-top: 2px; line-height: 1.3; }
+  .cal-day.selected { outline: 2px solid #185FA5; }
+  .cal-day.today .date-num { font-weight: bold; color: #e53e3e; }
+
+  .detail-section { margin-top: 8px; }
+  .detail-section h3 { font-size: 15px; color: #185FA5; margin-bottom: 8px; }
+
+  .reservation-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    border-left: 4px solid #ccc;
+  }
+  .reservation-card.status-申請中 { border-left-color: #d69e2e; }
+  .reservation-card.status-確定  { border-left-color: #38a169; }
+  .reservation-card.status-却下  { border-left-color: #e53e3e; }
+  .reservation-card.status-キャンセル { border-left-color: #999; }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+  .card-time { font-size: 16px; font-weight: bold; }
+  .status-badge {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: bold;
+  }
+  .status-badge.申請中 { background: #FEEBC8; color: #b7791f; }
+  .status-badge.確定   { background: #C6F6D5; color: #276749; }
+  .status-badge.却下   { background: #FCEBEB; color: #c53030; }
+  .status-badge.キャンセル { background: #f0f0f0; color: #777; }
+
+  .card-info { font-size: 13px; color: #555; line-height: 1.8; }
+  .card-info .info-row { display: flex; gap: 8px; }
+  .card-info .label { color: #888; min-width: 70px; }
+
+  .card-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .btn-approve {
+    flex: 1; background: #38a169; color: #fff; border: none;
+    padding: 10px; border-radius: 6px; font-size: 14px; cursor: pointer; min-height: 44px;
+  }
+  .btn-reject {
+    flex: 1; background: #e53e3e; color: #fff; border: none;
+    padding: 10px; border-radius: 6px; font-size: 14px; cursor: pointer; min-height: 44px;
+  }
+  .btn-delete {
+    background: #f0f0f0; color: #555; border: 1px solid #ccc;
+    padding: 10px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; min-height: 44px;
+  }
+
+  .no-data { text-align: center; color: #aaa; padding: 20px; font-size: 14px; }
+  .loading { text-align: center; color: #888; padding: 20px; }
+
+  /* ログイン画面 */
+  .login-box {
+    background: #fff;
+    border-radius: 10px;
+    padding: 24px;
+    margin-top: 40px;
+    text-align: center;
+  }
+  .login-box h2 { font-size: 17px; color: #185FA5; margin-bottom: 16px; }
+  .login-box input {
+    width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px;
+    font-size: 20px; letter-spacing: 8px; text-align: center; min-height: 52px;
+    margin-bottom: 12px;
+  }
+  .login-box input:focus { outline: none; border-color: #185FA5; }
+  .btn-login {
+    width: 100%; background: #185FA5; color: #fff; border: none;
+    padding: 14px; border-radius: 8px; font-size: 17px; cursor: pointer;
+    min-height: 44px; font-weight: bold;
+  }
+  .msg-error {
+    background: #FCEBEB; border: 1px solid #e53e3e; border-radius: 6px;
+    padding: 10px; color: #e53e3e; margin-bottom: 12px; font-size: 14px;
+  }
+</style>
+</head>
+<body>
+<div class="header" id="pageHeader" style="display:none;">
+  <h1 id="pageTitle">予約管理</h1>
+  <button class="btn-add" onclick="goToAdd()">＋ 直接入力</button>
+</div>
+<div class="container">
+
+  <!-- ログイン画面（認証未済の場合） -->
+  <div id="loginBox" class="login-box" style="display:none;">
+    <h2 id="loginTitle">管理者ログイン</h2>
+    <div id="loginErrorMsg"></div>
+    <input type="password" id="loginPassword" maxlength="4" inputmode="numeric"
+           placeholder="0000" onkeydown="if(event.key==='Enter') doLogin()">
+    <button class="btn-login" onclick="doLogin()" id="btnLogin">ログイン</button>
+  </div>
+
+  <!-- メインコンテンツ -->
+  <div id="mainContent" style="display:none;">
+    <div class="calendar-nav">
+      <button onclick="prevMonth()">&#9664;</button>
+      <span class="month-label" id="monthLabel"></span>
+      <button onclick="nextMonth()">&#9654;</button>
+    </div>
+
+    <div class="calendar-grid" id="calendarGrid">
+      <div class="day-header sun">日</div>
+      <div class="day-header">月</div>
+      <div class="day-header">火</div>
+      <div class="day-header">水</div>
+      <div class="day-header">木</div>
+      <div class="day-header">金</div>
+      <div class="day-header sat">土</div>
+    </div>
+
+    <div class="detail-section" id="detailSection" style="display:none;">
+      <h3 id="detailTitle"></h3>
+      <div id="detailCards"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbykihXW1722uZGZwcWtnROfrrkJehip1PyIEVuWwSKIoI9zq84plrYAb0rZnJj68_Jl/exec';
+
+var currentYear, currentMonth;
+var selectedDate = '';
+var allReservations = [];
+var jichikaiId = new URLSearchParams(location.search).get('jichikai') || '';
+var jichikaiName = '';
+
+async function callGAS(params) {
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(params),
+    redirect: 'follow'
+  });
+  return await res.json();
+}
+
+async function init() {
+  if (!jichikaiId) { location.href = 'index.html'; return; }
+
+  // sessionStorage から認証確認
+  var auth = null;
+  try { auth = JSON.parse(sessionStorage.getItem('jichiAuth') || 'null'); } catch(e) {}
+
+  if (auth && auth.id === jichikaiId && auth.authenticated) {
+    jichikaiName = auth.name || '';
+    showMain();
+  } else {
+    // 自治会名だけ取得してログイン画面を表示
+    try {
+      const r = await callGAS({ action: 'getConfigById', jichikaiId: jichikaiId });
+      if (r.success) jichikaiName = r.data.name;
+    } catch(e) {}
+    document.getElementById('loginTitle').textContent = (jichikaiName || '自治会') + ' 管理者ログイン';
+    document.getElementById('loginBox').style.display = 'block';
+  }
+}
+
+async function doLogin() {
+  var pw = document.getElementById('loginPassword').value.trim();
+  if (!/^\d{4}$/.test(pw)) {
+    document.getElementById('loginErrorMsg').innerHTML =
+      '<div class="msg-error">パスワードは数字4桁で入力してください</div>';
+    return;
+  }
+  document.getElementById('btnLogin').disabled = true;
+  document.getElementById('btnLogin').textContent = '確認中...';
+  try {
+    const result = await callGAS({ action: 'checkPassword', jichikaiId: jichikaiId, password: pw });
+    if (result.success) {
+      sessionStorage.setItem('jichiAuth', JSON.stringify({
+        id: jichikaiId, name: jichikaiName, authenticated: true
+      }));
+      document.getElementById('loginBox').style.display = 'none';
+      showMain();
+    } else {
+      document.getElementById('loginErrorMsg').innerHTML =
+        '<div class="msg-error">' + (result.error || 'パスワードが違います') + '</div>';
+      document.getElementById('btnLogin').disabled = false;
+      document.getElementById('btnLogin').textContent = 'ログイン';
+    }
+  } catch(e) {
+    document.getElementById('loginErrorMsg').innerHTML =
+      '<div class="msg-error">通信エラーが発生しました。再度お試しください。</div>';
+    document.getElementById('btnLogin').disabled = false;
+    document.getElementById('btnLogin').textContent = 'ログイン';
+  }
+}
+
+function showMain() {
+  document.getElementById('pageHeader').style.display = 'flex';
+  document.getElementById('pageTitle').textContent = (jichikaiName || '') + '　予約管理';
+  document.title = (jichikaiName || '') + '　予約管理';
+  document.getElementById('mainContent').style.display = 'block';
+  var now = new Date();
+  currentYear = now.getFullYear();
+  currentMonth = now.getMonth() + 1;
+  loadAndRender();
+}
+
+async function loadAndRender() {
+  document.getElementById('calendarGrid').innerHTML =
+    '<div class="day-header sun">日</div><div class="day-header">月</div><div class="day-header">火</div>'
+    + '<div class="day-header">水</div><div class="day-header">木</div><div class="day-header">金</div>'
+    + '<div class="day-header sat">土</div><div class="loading">読込中...</div>';
+
+  try {
+    const result = await callGAS({ action: 'getReservations', jichikaiId: jichikaiId, year: currentYear, month: currentMonth });
+    allReservations = (result.success && result.data) ? result.data : [];
+    renderCalendar();
+    if (selectedDate) showDetail(selectedDate);
+  } catch(e) {
+    document.getElementById('calendarGrid').innerHTML =
+      '<div class="day-header sun">日</div><div class="day-header">月</div><div class="day-header">火</div>'
+      + '<div class="day-header">水</div><div class="day-header">木</div><div class="day-header">金</div>'
+      + '<div class="day-header sat">土</div>'
+      + '<div style="grid-column:1/-1;color:#e53e3e;padding:16px;font-size:13px;">データ取得に失敗しました。ページを再読み込みしてください。</div>';
+  }
+}
+
+function renderCalendar() {
+  document.getElementById('monthLabel').textContent = currentYear + '年' + currentMonth + '月';
+  var grid = document.getElementById('calendarGrid');
+  grid.innerHTML =
+    '<div class="day-header sun">日</div><div class="day-header">月</div><div class="day-header">火</div>'
+    + '<div class="day-header">水</div><div class="day-header">木</div><div class="day-header">金</div>'
+    + '<div class="day-header sat">土</div>';
+
+  var firstDay = new Date(currentYear, currentMonth - 1, 1).getDay();
+  var daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  var dateStatus = {};
+  allReservations.forEach(function(r) {
+    if (!dateStatus[r.date]) dateStatus[r.date] = { pending: false, confirmed: false };
+    if (r.status === '申請中') dateStatus[r.date].pending = true;
+    if (r.status === '確定')   dateStatus[r.date].confirmed = true;
+  });
+
+  for (var i = 0; i < firstDay; i++) {
+    var empty = document.createElement('div');
+    empty.className = 'cal-day empty';
+    grid.appendChild(empty);
+  }
+
+  for (var d = 1; d <= daysInMonth; d++) {
+    var dateObj = new Date(currentYear, currentMonth - 1, d);
+    var mm = String(currentMonth).padStart(2, '0');
+    var dd = String(d).padStart(2, '0');
+    var dateStr = currentYear + '/' + mm + '/' + dd;
+    var dow = dateObj.getDay();
+
+    var cell = document.createElement('div');
+    cell.className = 'cal-day';
+
+    var numSpan = document.createElement('span');
+    numSpan.className = 'date-num';
+    numSpan.textContent = d;
+    if (dow === 0) numSpan.style.color = '#e53e3e';
+    if (dow === 6) numSpan.style.color = '#3182ce';
+    cell.appendChild(numSpan);
+
+    if (dateObj.toDateString() === today.toDateString()) cell.classList.add('today');
+
+    var ds = dateStatus[dateStr];
+    if (ds) {
+      if (ds.pending) {
+        var labelP = document.createElement('span');
+        labelP.className = 'status-label';
+        labelP.style.background = '#FEEBC8';
+        labelP.style.color = '#b7791f';
+        labelP.textContent = '申請中';
+        cell.appendChild(labelP);
+      }
+      if (ds.confirmed) {
+        var labelC = document.createElement('span');
+        labelC.className = 'status-label';
+        labelC.style.background = '#C6F6D5';
+        labelC.style.color = '#276749';
+        labelC.textContent = '確定';
+        cell.appendChild(labelC);
+      }
+      if (ds.pending && !ds.confirmed) cell.style.background = '#FFF9E6';
+      if (!ds.pending && ds.confirmed) cell.style.background = '#EAF3DE';
+      if (ds.pending && ds.confirmed)  cell.style.background = '#fff3cd';
+    }
+
+    if (dateStr === selectedDate) cell.style.outline = '2px solid #185FA5';
+
+    (function(ds2) {
+      cell.addEventListener('click', function() { showDetail(ds2); });
+    })(dateStr);
+
+    grid.appendChild(cell);
+  }
+}
+
+function showDetail(dateStr) {
+  selectedDate = dateStr;
+  renderCalendar();
+
+  var parts = dateStr.split('/');
+  var dow = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2])).getDay();
+  var weekdays = ['日','月','火','水','木','金','土'];
+
+  var filtered = allReservations.filter(function(r) {
+    return r.date === dateStr && r.status !== 'キャンセル';
+  });
+  filtered.sort(function(a, b) { return a.startTime.localeCompare(b.startTime); });
+
+  document.getElementById('detailTitle').textContent = dateStr + '（' + weekdays[dow] + '）の予約';
+  document.getElementById('detailSection').style.display = 'block';
+
+  var container = document.getElementById('detailCards');
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="no-data">この日の予約はありません</div>';
+    return;
+  }
+
+  container.innerHTML = '';
+  filtered.forEach(function(r) {
+    var card = document.createElement('div');
+    card.className = 'reservation-card status-' + r.status;
+
+    var header = document.createElement('div');
+    header.className = 'card-header';
+    var timeDiv = document.createElement('div');
+    timeDiv.className = 'card-time';
+    timeDiv.textContent = r.startTime + '〜' + r.endTime;
+    header.appendChild(timeDiv);
+    var badge = document.createElement('span');
+    badge.className = 'status-badge ' + r.status;
+    badge.textContent = r.status;
+    header.appendChild(badge);
+    card.appendChild(header);
+
+    var info = document.createElement('div');
+    info.className = 'card-info';
+    var infoHTML =
+      '<div class="info-row"><span class="label">氏名</span><span>' + (r.name || '') + '</span></div>'
+      + '<div class="info-row"><span class="label">電話</span><span>' + (r.phone || '') + '</span></div>'
+      + '<div class="info-row"><span class="label">用途</span><span>' + (r.purpose || '') + '</span></div>';
+
+    // 動的追加項目
+    if (r.extra) {
+      Object.keys(r.extra).forEach(function(key) {
+        infoHTML += '<div class="info-row"><span class="label">' + key + '</span><span>' + (r.extra[key] || '') + '</span></div>';
+      });
+    }
+    infoHTML += '<div class="info-row"><span class="label">受付番号</span><span>' + (r.receiptNo || '') + '</span></div>';
+    info.innerHTML = infoHTML;
+    card.appendChild(info);
+
+    if (r.status === '申請中') {
+      var actions = document.createElement('div');
+      actions.className = 'card-actions';
+      var btnA = document.createElement('button');
+      btnA.className = 'btn-approve';
+      btnA.textContent = '承認';
+      (function(rowNum) { btnA.addEventListener('click', function() { approveRow(rowNum); }); })(r.row);
+      var btnR = document.createElement('button');
+      btnR.className = 'btn-reject';
+      btnR.textContent = '却下';
+      (function(rowNum) { btnR.addEventListener('click', function() { rejectRow(rowNum); }); })(r.row);
+      var btnD = document.createElement('button');
+      btnD.className = 'btn-delete';
+      btnD.textContent = '削除';
+      (function(rowNum) { btnD.addEventListener('click', function() { deleteRow(rowNum); }); })(r.row);
+      actions.appendChild(btnA); actions.appendChild(btnR); actions.appendChild(btnD);
+      card.appendChild(actions);
+    } else if (r.status === '確定') {
+      var actions2 = document.createElement('div');
+      actions2.className = 'card-actions';
+      var btnD2 = document.createElement('button');
+      btnD2.className = 'btn-delete';
+      btnD2.textContent = '削除';
+      (function(rowNum) { btnD2.addEventListener('click', function() { deleteRow(rowNum); }); })(r.row);
+      actions2.appendChild(btnD2);
+      card.appendChild(actions2);
+    }
+
+    container.appendChild(card);
+  });
+}
+
+async function approveRow(rowNum) {
+  if (!confirm('この予約を承認しますか？')) return;
+  await callGAS({ action: 'approve', jichikaiId: jichikaiId, rowNum: rowNum });
+  loadAndRender();
+}
+
+async function rejectRow(rowNum) {
+  if (!confirm('この予約を却下しますか？')) return;
+  await callGAS({ action: 'reject', jichikaiId: jichikaiId, rowNum: rowNum });
+  loadAndRender();
+}
+
+async function deleteRow(rowNum) {
+  if (!confirm('削除（キャンセル）しますか？')) return;
+  await callGAS({ action: 'delete', jichikaiId: jichikaiId, rowNum: rowNum });
+  loadAndRender();
+}
+
+function prevMonth() {
+  currentMonth--;
+  if (currentMonth < 1) { currentMonth = 12; currentYear--; }
+  selectedDate = '';
+  document.getElementById('detailSection').style.display = 'none';
+  loadAndRender();
+}
+
+function nextMonth() {
+  currentMonth++;
+  if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+  selectedDate = '';
+  document.getElementById('detailSection').style.display = 'none';
+  loadAndRender();
+}
+
+function goToAdd() {
+  location.href = 'admin_add.html?jichikai=' + encodeURIComponent(jichikaiId);
+}
+
+init();
+</script>
+</body>
+</html>

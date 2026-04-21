@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>軽トラ予約</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; }
+
+  .header {
+    background: #185FA5;
+    color: #fff;
+    padding: 20px 16px;
+    text-align: center;
+    font-size: 20px;
+    font-weight: bold;
+  }
+
+  .container { max-width: 480px; margin: 0 auto; padding: 24px 16px; }
+
+  .section-title {
+    font-size: 15px;
+    font-weight: bold;
+    color: #185FA5;
+    margin-bottom: 10px;
+  }
+
+  .loading { text-align: center; color: #888; padding: 40px; font-size: 16px; }
+
+  .jichikai-list { margin-bottom: 24px; }
+
+  .jichikai-btn {
+    width: 100%;
+    background: #fff;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: 17px;
+    cursor: pointer;
+    text-align: left;
+    margin-bottom: 8px;
+    min-height: 52px;
+    transition: border-color 0.15s;
+  }
+  .jichikai-btn:hover { border-color: #185FA5; background: #f0f7ff; }
+  .jichikai-btn.selected { border-color: #185FA5; background: #e8f0fa; font-weight: bold; }
+
+  .role-section { margin-bottom: 24px; }
+  .role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .role-btn {
+    background: #fff;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    padding: 16px 10px;
+    font-size: 16px;
+    cursor: pointer;
+    text-align: center;
+    min-height: 52px;
+  }
+  .role-btn:hover { border-color: #185FA5; background: #f0f7ff; }
+  .role-btn.selected { border-color: #185FA5; background: #185FA5; color: #fff; font-weight: bold; }
+
+  .password-section { margin-bottom: 24px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 14px; color: #555; margin-bottom: 6px; }
+  .form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 20px;
+    letter-spacing: 8px;
+    text-align: center;
+    min-height: 52px;
+  }
+  .form-group input:focus { outline: none; border-color: #185FA5; }
+
+  .btn-go {
+    width: 100%;
+    background: #185FA5;
+    color: #fff;
+    border: none;
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 18px;
+    cursor: pointer;
+    min-height: 52px;
+    font-weight: bold;
+    margin-top: 8px;
+  }
+  .btn-go:disabled { background: #aaa; cursor: not-allowed; }
+
+  .msg-error {
+    background: #FCEBEB;
+    border: 1px solid #e53e3e;
+    border-radius: 6px;
+    padding: 12px;
+    color: #e53e3e;
+    margin-bottom: 16px;
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .divider { border: none; border-top: 1px solid #e0e0e0; margin: 20px 0; }
+
+  .step { display: none; }
+  .step.active { display: block; }
+</style>
+</head>
+<body>
+<div class="header">軽トラック予約システム</div>
+<div class="container">
+
+  <div id="loadingArea" class="loading">読み込み中...</div>
+  <div id="errorArea"></div>
+
+  <!-- STEP1: 自治会選択 -->
+  <div id="step1" class="step">
+    <p class="section-title">① ご自身の自治会を選んでください</p>
+    <div class="jichikai-list" id="jichikaiList"></div>
+  </div>
+
+  <!-- STEP2: 役割選択 -->
+  <div id="step2" class="step">
+    <p class="section-title">② 役割を選んでください</p>
+    <div class="role-grid">
+      <button class="role-btn" id="roleGeneral" onclick="selectRole('general')">
+        一般会員<br><span style="font-size:12px;font-weight:normal;color:#888;">予約申請</span>
+      </button>
+      <button class="role-btn" id="roleAdmin" onclick="selectRole('admin')">
+        役員・管理者<br><span style="font-size:12px;font-weight:normal;color:#888;">予約管理</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- STEP3: パスワード（役員のみ） -->
+  <div id="step3" class="step">
+    <p class="section-title">③ 管理者パスワードを入力してください</p>
+    <div id="pwErrorMsg"></div>
+    <div class="form-group">
+      <label>パスワード（4桁）</label>
+      <input type="password" id="passwordInput" maxlength="4" inputmode="numeric"
+             placeholder="0000" onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+    <button class="btn-go" onclick="doLogin()" id="btnLogin">管理画面へ進む</button>
+    <br>
+    <button style="width:100%;background:none;border:1px solid #ccc;padding:12px;border-radius:8px;font-size:15px;cursor:pointer;margin-top:10px;min-height:44px;" onclick="goBackRole()">← 役割選択に戻る</button>
+  </div>
+
+</div>
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbykihXW1722uZGZwcWtnROfrrkJehip1PyIEVuWwSKIoI9zq84plrYAb0rZnJj68_Jl/exec';
+
+var selectedJichikaiId = '';
+var selectedJichikaiName = '';
+var selectedRole = '';
+
+async function callGAS(params) {
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(params),
+    redirect: 'follow'
+  });
+  return await res.json();
+}
+
+async function init() {
+  document.getElementById('loadingArea').style.display = 'block';
+  try {
+    const result = await callGAS({ action: 'getConfig' });
+    document.getElementById('loadingArea').style.display = 'none';
+    if (!result.success) {
+      document.getElementById('errorArea').innerHTML =
+        '<div class="msg-error">自治会情報の読み込みに失敗しました。<br>' + result.error + '</div>';
+      return;
+    }
+    renderJichikaiList(result.data);
+    document.getElementById('step1').classList.add('active');
+  } catch(e) {
+    document.getElementById('loadingArea').style.display = 'none';
+    document.getElementById('errorArea').innerHTML =
+      '<div class="msg-error">通信エラーが発生しました。<br>ページを再読み込みしてください。</div>';
+  }
+}
+
+function renderJichikaiList(list) {
+  var html = '';
+  list.forEach(function(item) {
+    html += '<button class="jichikai-btn" id="jBtn_' + item.id + '" onclick="selectJichikai(\'' + item.id + '\', \'' + escapeAttr(item.name) + '\')">'
+          + item.name + '</button>';
+  });
+  document.getElementById('jichikaiList').innerHTML = html;
+}
+
+function selectJichikai(id, name) {
+  selectedJichikaiId = id;
+  selectedJichikaiName = name;
+
+  document.querySelectorAll('.jichikai-btn').forEach(function(btn) {
+    btn.classList.remove('selected');
+  });
+  var btn = document.getElementById('jBtn_' + id);
+  if (btn) btn.classList.add('selected');
+
+  setTimeout(function() {
+    document.getElementById('step2').classList.add('active');
+    document.getElementById('step2').scrollIntoView({ behavior: 'smooth' });
+  }, 150);
+}
+
+function selectRole(role) {
+  selectedRole = role;
+  document.getElementById('roleGeneral').classList.toggle('selected', role === 'general');
+  document.getElementById('roleAdmin').classList.toggle('selected', role === 'admin');
+
+  if (role === 'general') {
+    // 一般会員 → 予約フォームへ
+    location.href = 'yoyaku.html?jichikai=' + encodeURIComponent(selectedJichikaiId);
+  } else {
+    // 役員 → パスワード入力へ
+    document.getElementById('step3').classList.add('active');
+    document.getElementById('step3').scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('passwordInput').value = '';
+    document.getElementById('pwErrorMsg').innerHTML = '';
+    document.getElementById('passwordInput').focus();
+  }
+}
+
+function goBackRole() {
+  document.getElementById('step3').classList.remove('active');
+  document.getElementById('roleGeneral').classList.remove('selected');
+  document.getElementById('roleAdmin').classList.remove('selected');
+  selectedRole = '';
+}
+
+async function doLogin() {
+  var pw = document.getElementById('passwordInput').value.trim();
+  if (!pw) {
+    document.getElementById('pwErrorMsg').innerHTML = '<div class="msg-error">パスワードを入力してください</div>';
+    return;
+  }
+  if (!/^\d{4}$/.test(pw)) {
+    document.getElementById('pwErrorMsg').innerHTML = '<div class="msg-error">パスワードは数字4桁で入力してください</div>';
+    return;
+  }
+
+  document.getElementById('btnLogin').disabled = true;
+  document.getElementById('btnLogin').textContent = '確認中...';
+
+  try {
+    const result = await callGAS({ action: 'checkPassword', jichikaiId: selectedJichikaiId, password: pw });
+    if (result.success) {
+      sessionStorage.setItem('jichiAuth', JSON.stringify({
+        id: selectedJichikaiId,
+        name: selectedJichikaiName,
+        authenticated: true
+      }));
+      location.href = 'admin.html?jichikai=' + encodeURIComponent(selectedJichikaiId);
+    } else {
+      document.getElementById('pwErrorMsg').innerHTML = '<div class="msg-error">' + (result.error || 'パスワードが違います') + '</div>';
+      document.getElementById('btnLogin').disabled = false;
+      document.getElementById('btnLogin').textContent = '管理画面へ進む';
+    }
+  } catch(e) {
+    document.getElementById('pwErrorMsg').innerHTML = '<div class="msg-error">通信エラーが発生しました。再度お試しください。</div>';
+    document.getElementById('btnLogin').disabled = false;
+    document.getElementById('btnLogin').textContent = '管理画面へ進む';
+  }
+}
+
+function escapeAttr(s) {
+  return s.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+}
+
+init();
+</script>
+</body>
+</html>

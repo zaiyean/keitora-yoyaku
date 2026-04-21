@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>軽トラック予約</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: sans-serif; background: #f5f5f5; color: #333; }
+
+  .header {
+    background: #185FA5;
+    color: #fff;
+    padding: 14px 16px;
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+  }
+
+  .container { max-width: 480px; margin: 0 auto; padding: 16px; }
+
+  /* カレンダー */
+  .calendar-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .calendar-nav button {
+    background: none;
+    border: 1px solid #185FA5;
+    color: #185FA5;
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+    min-height: 44px;
+  }
+  .calendar-nav .month-label { font-size: 17px; font-weight: bold; }
+
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: 16px;
+  }
+  .calendar-grid .day-header {
+    text-align: center;
+    font-size: 12px;
+    color: #888;
+    padding: 4px 0;
+  }
+  .calendar-grid .day-header.sun { color: #e53e3e; }
+  .calendar-grid .day-header.sat { color: #3182ce; }
+
+  .cal-day {
+    text-align: center;
+    padding: 8px 2px;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+  }
+  .cal-day.empty { cursor: default; }
+  .cal-day.past { color: #ccc; cursor: not-allowed; }
+  .cal-day.today { font-weight: bold; color: #e53e3e; }
+  .cal-day.booked { text-decoration: line-through; color: #aaa; cursor: not-allowed; }
+  .cal-day.booked::after { content: '●'; font-size: 8px; color: #185FA5; display: block; }
+  .cal-day.selected { background: #185FA5; color: #fff; border-radius: 50%; }
+  .cal-day.available:not(.past):not(.booked):hover { background: #dbeafe; }
+  .cal-day.sun-text { color: #e53e3e; }
+  .cal-day.sat-text { color: #3182ce; }
+  .cal-day.selected .sun-inner,
+  .cal-day.selected .sat-inner { color: #fff; }
+
+  /* 時間帯 */
+  .time-section { margin-bottom: 16px; }
+  .time-section h3 { font-size: 15px; margin-bottom: 8px; color: #185FA5; }
+  .time-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .time-btn {
+    padding: 12px;
+    border: 2px solid #185FA5;
+    border-radius: 6px;
+    background: #fff;
+    color: #185FA5;
+    font-size: 15px;
+    cursor: pointer;
+    min-height: 44px;
+    text-align: center;
+  }
+  .time-btn:disabled {
+    border-color: #ccc;
+    color: #aaa;
+    text-decoration: line-through;
+    cursor: not-allowed;
+    background: #f5f5f5;
+  }
+  .time-btn.selected { background: #185FA5; color: #fff; }
+
+  /* 選択確認バッジ */
+  .selected-badge {
+    background: #EAF3DE;
+    border: 1px solid #185FA5;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: #185FA5;
+    font-weight: bold;
+  }
+
+  /* フォーム */
+  .form-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .form-row .form-group { flex: 1; }
+  .form-group { margin-bottom: 10px; }
+  .form-group label { display: block; font-size: 13px; color: #555; margin-bottom: 4px; }
+  .form-group input,
+  .form-group select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 15px;
+    min-height: 44px;
+  }
+  .form-group input:focus,
+  .form-group select:focus { outline: none; border-color: #185FA5; }
+  .optional { color: #aaa; font-size: 11px; }
+
+  .submit-note { font-size: 12px; color: #888; margin-bottom: 10px; text-align: center; }
+
+  .btn-submit {
+    width: 100%;
+    background: #185FA5;
+    color: #fff;
+    border: none;
+    padding: 14px;
+    border-radius: 8px;
+    font-size: 17px;
+    cursor: pointer;
+    min-height: 44px;
+    font-weight: bold;
+  }
+  .btn-submit:disabled { background: #aaa; cursor: not-allowed; }
+
+  .msg-success {
+    background: #EAF3DE;
+    border: 1px solid #185FA5;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    margin-top: 20px;
+  }
+  .msg-success h2 { color: #185FA5; margin-bottom: 8px; }
+
+  .msg-error {
+    background: #FCEBEB;
+    border: 1px solid #e53e3e;
+    border-radius: 6px;
+    padding: 12px;
+    color: #e53e3e;
+    margin-bottom: 12px;
+    font-size: 14px;
+  }
+
+  .loading { text-align: center; color: #888; padding: 20px; }
+  .section-divider { border: none; border-top: 1px solid #e0e0e0; margin: 16px 0; }
+</style>
+</head>
+<body>
+<div class="header" id="pageTitle">軽トラック予約</div>
+<div class="container">
+
+  <div id="initLoading" class="loading">読み込み中...</div>
+
+  <div id="mainContent" style="display:none;">
+    <div id="stepCalendar">
+      <div class="calendar-nav">
+        <button onclick="prevMonth()">&#9664;</button>
+        <span class="month-label" id="monthLabel"></span>
+        <button onclick="nextMonth()">&#9654;</button>
+      </div>
+      <div class="calendar-grid" id="calendarGrid">
+        <div class="day-header sun">日</div>
+        <div class="day-header">月</div>
+        <div class="day-header">火</div>
+        <div class="day-header">水</div>
+        <div class="day-header">木</div>
+        <div class="day-header">金</div>
+        <div class="day-header sat">土</div>
+      </div>
+
+      <hr class="section-divider">
+
+      <div class="time-section" id="timeSection" style="display:none;">
+        <h3 id="timeSectionTitle">時間帯を選択</h3>
+        <div class="time-grid" id="timeGrid"></div>
+      </div>
+    </div>
+
+    <div class="selected-badge" id="selectedBadge" style="display:none;"></div>
+
+    <div id="stepForm" style="display:none;">
+      <div id="errorMsg"></div>
+      <div id="dynamicFormFields"></div>
+      <div class="form-group">
+        <label>メールアドレス <span class="optional">（任意・確認メール送付先）</span></label>
+        <input type="email" id="field_email" placeholder="例：example@gmail.com">
+      </div>
+      <p class="submit-note">※承認後に確定となります</p>
+      <button class="btn-submit" id="btnSubmit" onclick="submitForm()">申請する</button>
+    </div>
+  </div>
+
+  <div class="msg-success" id="successMsg" style="display:none;">
+    <h2>申請を受け付けました</h2>
+    <p>仮受付メールをお送りしました（メールアドレス入力時）。<br>管理者の承認後、確定メールをお送りします。</p>
+    <p style="margin-top:12px; font-size:13px; color:#555;" id="receiptDisplay"></p>
+  </div>
+
+</div>
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbykihXW1722uZGZwcWtnROfrrkJehip1PyIEVuWwSKIoI9zq84plrYAb0rZnJj68_Jl/exec';
+
+var currentYear, currentMonth;
+var selectedDate = '';
+var selectedTime = '';
+var bookedSlots = {};
+var jichikaiConfig = null;
+
+var jichikaiId = new URLSearchParams(location.search).get('jichikai') || '';
+
+async function callGAS(params) {
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(params),
+    redirect: 'follow'
+  });
+  return await res.json();
+}
+
+async function init() {
+  if (!jichikaiId) {
+    location.href = 'index.html';
+    return;
+  }
+
+  try {
+    const result = await callGAS({ action: 'getConfigById', jichikaiId: jichikaiId });
+    if (!result.success) {
+      document.getElementById('initLoading').textContent = '自治会情報の取得に失敗しました。';
+      return;
+    }
+    jichikaiConfig = result.data;
+    document.getElementById('pageTitle').textContent = jichikaiConfig.name + '　軽トラック予約';
+    document.title = jichikaiConfig.name + '　軽トラック予約';
+    document.getElementById('initLoading').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+
+    var now = new Date();
+    currentYear = now.getFullYear();
+    currentMonth = now.getMonth() + 1;
+    loadAndRender();
+  } catch(e) {
+    document.getElementById('initLoading').textContent = '読み込みエラーが発生しました。再度お試しください。';
+  }
+}
+
+async function loadAndRender() {
+  document.getElementById('calendarGrid').innerHTML =
+    '<div class="day-header sun">日</div><div class="day-header">月</div><div class="day-header">火</div>'
+    + '<div class="day-header">水</div><div class="day-header">木</div><div class="day-header">金</div>'
+    + '<div class="day-header sat">土</div><div class="loading">読込中...</div>';
+
+  try {
+    const result = await callGAS({ action: 'getReservations', jichikaiId: jichikaiId, year: currentYear, month: currentMonth });
+    bookedSlots = {};
+    if (result.success && result.data) {
+      result.data.forEach(function(r) {
+        if (r.status === '申請中' || r.status === '確定') {
+          if (!bookedSlots[r.date]) bookedSlots[r.date] = [];
+          bookedSlots[r.date].push(r.startTime);
+        }
+      });
+    }
+  } catch(e) {}
+  renderCalendar();
+}
+
+function renderCalendar() {
+  document.getElementById('monthLabel').textContent = currentYear + '年' + currentMonth + '月';
+  var grid = document.getElementById('calendarGrid');
+  grid.innerHTML =
+    '<div class="day-header sun">日</div><div class="day-header">月</div><div class="day-header">火</div>'
+    + '<div class="day-header">水</div><div class="day-header">木</div><div class="day-header">金</div>'
+    + '<div class="day-header sat">土</div>';
+
+  var firstDay = new Date(currentYear, currentMonth - 1, 1).getDay();
+  var daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+  var allSlots = ['8:00','9:00','10:00','11:00','13:00','14:00','15:00','16:00'];
+
+  for (var i = 0; i < firstDay; i++) {
+    var empty = document.createElement('div');
+    empty.className = 'cal-day empty';
+    grid.appendChild(empty);
+  }
+
+  for (var d = 1; d <= daysInMonth; d++) {
+    var dateObj = new Date(currentYear, currentMonth - 1, d);
+    var mm = String(currentMonth).padStart(2, '0');
+    var dd = String(d).padStart(2, '0');
+    var dateStr = currentYear + '/' + mm + '/' + dd;
+    var dow = dateObj.getDay();
+    var cell = document.createElement('div');
+    cell.className = 'cal-day';
+    cell.textContent = d;
+
+    var isPast = dateObj < today;
+    var slots = bookedSlots[dateStr] || [];
+    var isFullyBooked = allSlots.every(function(s) { return slots.indexOf(s) !== -1; });
+
+    if (isPast) {
+      cell.classList.add('past');
+    } else if (isFullyBooked) {
+      cell.classList.add('booked');
+    } else {
+      cell.classList.add('available');
+      if (dow === 0) cell.classList.add('sun-text');
+      if (dow === 6) cell.classList.add('sat-text');
+      if (dateStr === selectedDate) cell.classList.add('selected');
+      (function(ds) {
+        cell.addEventListener('click', function() { selectDate(ds); });
+      })(dateStr);
+    }
+    if (dateObj.toDateString() === today.toDateString()) cell.classList.add('today');
+    grid.appendChild(cell);
+  }
+}
+
+function selectDate(dateStr) {
+  selectedDate = dateStr;
+  selectedTime = '';
+  renderCalendar();
+  renderTimeSlots(dateStr);
+  document.getElementById('timeSection').style.display = 'block';
+  document.getElementById('stepForm').style.display = 'none';
+  document.getElementById('selectedBadge').style.display = 'none';
+}
+
+function renderTimeSlots(dateStr) {
+  var allSlots = [
+    {label:'8:00〜9:00', start:'8:00'},
+    {label:'9:00〜10:00', start:'9:00'},
+    {label:'10:00〜11:00', start:'10:00'},
+    {label:'11:00〜12:00', start:'11:00'},
+    {label:'13:00〜14:00', start:'13:00'},
+    {label:'14:00〜15:00', start:'14:00'},
+    {label:'15:00〜16:00', start:'15:00'},
+    {label:'16:00〜17:00', start:'16:00'}
+  ];
+
+  var booked = bookedSlots[dateStr] || [];
+  var parts = dateStr.split('/');
+  var dateObj2 = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+  var dow = dateObj2.getDay();
+  var weekdays = ['日','月','火','水','木','金','土'];
+  var now = new Date();
+  var isToday = dateObj2.toDateString() === now.toDateString();
+  var currentHour = now.getHours();
+
+  document.getElementById('timeSectionTitle').textContent =
+    dateStr + '（' + weekdays[dow] + '）の時間帯を選択';
+
+  var grid = document.getElementById('timeGrid');
+  grid.innerHTML = '';
+
+  allSlots.forEach(function(slot) {
+    var btn = document.createElement('button');
+    btn.className = 'time-btn';
+    btn.textContent = slot.label;
+    var slotHour = parseInt(slot.start.split(':')[0]);
+    var isPastTime = isToday && slotHour <= currentHour;
+
+    if (booked.indexOf(slot.start) !== -1) {
+      btn.disabled = true;
+      btn.textContent = slot.label + '（予約済）';
+    } else if (isPastTime) {
+      btn.disabled = true;
+      btn.textContent = slot.label + '（受付終了）';
+    } else {
+      btn.addEventListener('click', function() {
+        selectedTime = slot.start;
+        document.querySelectorAll('.time-btn').forEach(function(b) { b.classList.remove('selected'); });
+        btn.classList.add('selected');
+        showForm(dateStr, slot);
+      });
+    }
+    grid.appendChild(btn);
+  });
+}
+
+function showForm(dateStr, slot) {
+  var parts = dateStr.split('/');
+  var dow = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2])).getDay();
+  var weekdays = ['日','月','火','水','木','金','土'];
+
+  document.getElementById('selectedBadge').style.display = 'block';
+  document.getElementById('selectedBadge').textContent =
+    '選択中：' + dateStr + '（' + weekdays[dow] + '）' + slot.label;
+
+  // 動的フォーム生成
+  buildDynamicForm();
+
+  document.getElementById('stepForm').style.display = 'block';
+  document.getElementById('errorMsg').innerHTML = '';
+}
+
+function buildDynamicForm() {
+  if (!jichikaiConfig) return;
+  var container = document.getElementById('dynamicFormFields');
+  container.innerHTML = '';
+
+  jichikaiConfig.questionItems.forEach(function(item) {
+    var div = document.createElement('div');
+    div.className = 'form-group';
+
+    var label = document.createElement('label');
+    label.innerHTML = item + ' <span style="color:red">*</span>';
+    div.appendChild(label);
+
+    if (item === '用途') {
+      var sel = document.createElement('select');
+      sel.id = 'field_用途';
+      var opt0 = document.createElement('option');
+      opt0.value = '';
+      opt0.textContent = '-- 選択してください --';
+      sel.appendChild(opt0);
+      jichikaiConfig.purposeOptions.forEach(function(p) {
+        var opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p;
+        sel.appendChild(opt);
+      });
+      div.appendChild(sel);
+    } else {
+      var input = document.createElement('input');
+      input.id = 'field_' + item;
+      input.type = item === '電話番号' ? 'tel' : 'text';
+      if (item === '電話番号') input.placeholder = '例：090-1234-5678';
+      else if (item === '氏名') input.placeholder = '例：山田 太郎';
+      else input.placeholder = item + 'を入力';
+      div.appendChild(input);
+    }
+
+    container.appendChild(div);
+  });
+}
+
+async function submitForm() {
+  var errors = [];
+  var answers = {};
+
+  jichikaiConfig.questionItems.forEach(function(item) {
+    var el = document.getElementById('field_' + item);
+    if (!el) return;
+    var val = el.value.trim ? el.value.trim() : el.value;
+    if (!val) {
+      errors.push(item + 'を' + (item === '用途' ? '選択' : '入力') + 'してください');
+    } else {
+      if (item === '電話番号' && !/^[\d\-]+$/.test(val)) {
+        errors.push('電話番号は数字とハイフンのみ入力してください');
+      }
+      answers[item] = val;
+    }
+  });
+
+  var email = document.getElementById('field_email').value.trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errors.push('メールアドレスの形式が正しくありません');
+  }
+
+  if (!selectedDate || !selectedTime) errors.push('日時を選択してください');
+
+  if (errors.length > 0) {
+    document.getElementById('errorMsg').innerHTML =
+      '<div class="msg-error">' + errors.join('<br>') + '</div>';
+    return;
+  }
+
+  document.getElementById('btnSubmit').disabled = true;
+  document.getElementById('btnSubmit').textContent = '送信中...';
+
+  try {
+    const result = await callGAS({
+      action: 'submit',
+      jichikaiId: jichikaiId,
+      date: selectedDate,
+      startTime: selectedTime,
+      email: email,
+      answers: answers
+    });
+
+    if (result.success) {
+      document.getElementById('stepCalendar').style.display = 'none';
+      document.getElementById('selectedBadge').style.display = 'none';
+      document.getElementById('stepForm').style.display = 'none';
+      document.getElementById('successMsg').style.display = 'block';
+      document.getElementById('receiptDisplay').textContent = '受付番号：' + result.receiptNo;
+    } else {
+      document.getElementById('errorMsg').innerHTML =
+        '<div class="msg-error">' + (result.error || 'エラーが発生しました。') + '</div>';
+      document.getElementById('btnSubmit').disabled = false;
+      document.getElementById('btnSubmit').textContent = '申請する';
+    }
+  } catch(e) {
+    document.getElementById('errorMsg').innerHTML =
+      '<div class="msg-error">送信中にエラーが発生しました。再度お試しください。</div>';
+    document.getElementById('btnSubmit').disabled = false;
+    document.getElementById('btnSubmit').textContent = '申請する';
+  }
+}
+
+function prevMonth() {
+  currentMonth--;
+  if (currentMonth < 1) { currentMonth = 12; currentYear--; }
+  selectedDate = ''; selectedTime = '';
+  document.getElementById('timeSection').style.display = 'none';
+  document.getElementById('stepForm').style.display = 'none';
+  document.getElementById('selectedBadge').style.display = 'none';
+  loadAndRender();
+}
+
+function nextMonth() {
+  currentMonth++;
+  if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+  selectedDate = ''; selectedTime = '';
+  document.getElementById('timeSection').style.display = 'none';
+  document.getElementById('stepForm').style.display = 'none';
+  document.getElementById('selectedBadge').style.display = 'none';
+  loadAndRender();
+}
+
+init();
+</script>
+</body>
+</html>

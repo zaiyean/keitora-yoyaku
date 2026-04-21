@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>直接入力 - 軽トラ予約</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: sans-serif; background: #f5f5f5; color: #333; }
+
+  .header {
+    background: #185FA5;
+    color: #fff;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .btn-back {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.6);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    min-height: 44px;
+  }
+  .header h1 { font-size: 17px; }
+
+  .container { max-width: 480px; margin: 0 auto; padding: 16px; }
+
+  .notice {
+    background: #fff3cd;
+    border: 1px solid #d69e2e;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #744210;
+    margin-bottom: 16px;
+  }
+
+  .form-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .form-row .form-group { flex: 1; }
+  .form-group { margin-bottom: 10px; }
+  .form-group label { display: block; font-size: 13px; color: #555; margin-bottom: 4px; }
+  .form-group input,
+  .form-group select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 15px;
+    min-height: 44px;
+  }
+  .form-group input:focus,
+  .form-group select:focus { outline: none; border-color: #185FA5; }
+  .optional { color: #aaa; font-size: 11px; }
+
+  .msg-error {
+    background: #FCEBEB;
+    border: 1px solid #e53e3e;
+    border-radius: 6px;
+    padding: 12px;
+    color: #e53e3e;
+    margin-bottom: 12px;
+    font-size: 14px;
+  }
+
+  .btn-submit {
+    width: 100%;
+    background: #185FA5;
+    color: #fff;
+    border: none;
+    padding: 14px;
+    border-radius: 8px;
+    font-size: 17px;
+    cursor: pointer;
+    min-height: 44px;
+    font-weight: bold;
+    margin-top: 8px;
+  }
+  .btn-submit:disabled { background: #aaa; cursor: not-allowed; }
+
+  .msg-success {
+    background: #EAF3DE;
+    border: 1px solid #185FA5;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    margin-top: 20px;
+  }
+  .msg-success h2 { color: #185FA5; margin-bottom: 8px; }
+
+  .btn-again {
+    margin-top: 14px;
+    background: #185FA5;
+    color: #fff;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 15px;
+    cursor: pointer;
+    min-height: 44px;
+  }
+
+  .loading { text-align: center; color: #888; padding: 40px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <button class="btn-back" onclick="goBack()">← 一覧</button>
+  <h1>直接入力</h1>
+</div>
+<div class="container">
+
+  <div id="initLoading" class="loading">読み込み中...</div>
+
+  <div id="formArea" style="display:none;">
+    <div class="notice">
+      直接入力は承認不要で即座に確定済みになります。
+    </div>
+
+    <div id="errorMsg"></div>
+
+    <!-- 利用日・開始時間 -->
+    <div class="form-row">
+      <div class="form-group">
+        <label>利用日 <span style="color:red">*</span></label>
+        <input type="date" id="date">
+      </div>
+      <div class="form-group">
+        <label>開始時間 <span style="color:red">*</span></label>
+        <select id="startTime">
+          <option value="">選択</option>
+          <option value="8:00">8:00〜9:00</option>
+          <option value="9:00">9:00〜10:00</option>
+          <option value="10:00">10:00〜11:00</option>
+          <option value="11:00">11:00〜12:00</option>
+          <option value="13:00">13:00〜14:00</option>
+          <option value="14:00">14:00〜15:00</option>
+          <option value="15:00">15:00〜16:00</option>
+          <option value="16:00">16:00〜17:00</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 動的フォームフィールド -->
+    <div id="dynamicFormFields"></div>
+
+    <div class="form-group">
+      <label>メールアドレス <span class="optional">（任意）</span></label>
+      <input type="email" id="field_email" placeholder="例：example@gmail.com">
+    </div>
+
+    <button class="btn-submit" id="btnSubmit" onclick="submitForm()">登録（確定済みとして保存）</button>
+  </div>
+
+  <div class="msg-success" id="successMsg" style="display:none;">
+    <h2>登録完了</h2>
+    <p>確定済みとして保存しました。</p>
+    <p style="margin-top:8px; font-size:13px; color:#555;" id="receiptDisplay"></p>
+    <button class="btn-again" onclick="resetForm()">続けて入力</button>
+  </div>
+
+</div>
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbykihXW1722uZGZwcWtnROfrrkJehip1PyIEVuWwSKIoI9zq84plrYAb0rZnJj68_Jl/exec';
+
+var jichikaiId = new URLSearchParams(location.search).get('jichikai') || '';
+var jichikaiConfig = null;
+
+async function callGAS(params) {
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(params),
+    redirect: 'follow'
+  });
+  return await res.json();
+}
+
+async function init() {
+  if (!jichikaiId) { location.href = 'index.html'; return; }
+
+  try {
+    const result = await callGAS({ action: 'getConfigById', jichikaiId: jichikaiId });
+    if (!result.success) {
+      document.getElementById('initLoading').textContent = '自治会情報の取得に失敗しました。';
+      return;
+    }
+    jichikaiConfig = result.data;
+    document.getElementById('initLoading').style.display = 'none';
+    buildDynamicForm();
+    document.getElementById('formArea').style.display = 'block';
+  } catch(e) {
+    document.getElementById('initLoading').textContent = '読み込みエラーが発生しました。再度お試しください。';
+  }
+}
+
+function buildDynamicForm() {
+  if (!jichikaiConfig) return;
+  var container = document.getElementById('dynamicFormFields');
+  container.innerHTML = '';
+
+  jichikaiConfig.questionItems.forEach(function(item) {
+    var div = document.createElement('div');
+    div.className = 'form-group';
+
+    var label = document.createElement('label');
+    label.innerHTML = item + ' <span style="color:red">*</span>';
+    div.appendChild(label);
+
+    if (item === '用途') {
+      var sel = document.createElement('select');
+      sel.id = 'field_用途';
+      var opt0 = document.createElement('option');
+      opt0.value = '';
+      opt0.textContent = '-- 選択してください --';
+      sel.appendChild(opt0);
+      jichikaiConfig.purposeOptions.forEach(function(p) {
+        var opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p;
+        sel.appendChild(opt);
+      });
+      div.appendChild(sel);
+    } else {
+      var input = document.createElement('input');
+      input.id = 'field_' + item;
+      input.type = item === '電話番号' ? 'tel' : 'text';
+      if (item === '電話番号') input.placeholder = '例：090-1234-5678';
+      else if (item === '氏名') input.placeholder = '例：山田 太郎';
+      else input.placeholder = item + 'を入力';
+      div.appendChild(input);
+    }
+
+    container.appendChild(div);
+  });
+}
+
+async function submitForm() {
+  var date = document.getElementById('date').value;
+  var startTime = document.getElementById('startTime').value;
+
+  var errors = [];
+  if (!date) errors.push('利用日を入力してください');
+  if (!startTime) errors.push('開始時間を選択してください');
+
+  var answers = {};
+  if (jichikaiConfig) {
+    jichikaiConfig.questionItems.forEach(function(item) {
+      var el = document.getElementById('field_' + item);
+      if (!el) return;
+      var val = el.value.trim ? el.value.trim() : el.value;
+      if (!val) {
+        errors.push(item + 'を' + (item === '用途' ? '選択' : '入力') + 'してください');
+      } else {
+        if (item === '電話番号' && !/^[\d\-]+$/.test(val)) {
+          errors.push('電話番号は数字とハイフンのみ入力してください');
+        }
+        answers[item] = val;
+      }
+    });
+  }
+
+  var email = document.getElementById('field_email').value.trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errors.push('メールアドレスの形式が正しくありません');
+  }
+
+  if (errors.length > 0) {
+    document.getElementById('errorMsg').innerHTML =
+      '<div class="msg-error">' + errors.join('<br>') + '</div>';
+    return;
+  }
+
+  var dateFormatted = date.replace(/-/g, '/');
+
+  document.getElementById('btnSubmit').disabled = true;
+  document.getElementById('btnSubmit').textContent = '保存中...';
+
+  try {
+    const result = await callGAS({
+      action: 'addDirect',
+      jichikaiId: jichikaiId,
+      date: dateFormatted,
+      startTime: startTime,
+      email: email,
+      answers: answers
+    });
+
+    if (result.success) {
+      document.getElementById('formArea').style.display = 'none';
+      document.getElementById('successMsg').style.display = 'block';
+      document.getElementById('receiptDisplay').textContent = '受付番号：' + result.receiptNo;
+    } else {
+      document.getElementById('errorMsg').innerHTML =
+        '<div class="msg-error">' + (result.error || 'エラーが発生しました。') + '</div>';
+      document.getElementById('btnSubmit').disabled = false;
+      document.getElementById('btnSubmit').textContent = '登録（確定済みとして保存）';
+    }
+  } catch(e) {
+    document.getElementById('errorMsg').innerHTML =
+      '<div class="msg-error">エラーが発生しました。再度お試しください。</div>';
+    document.getElementById('btnSubmit').disabled = false;
+    document.getElementById('btnSubmit').textContent = '登録（確定済みとして保存）';
+  }
+}
+
+function resetForm() {
+  document.getElementById('formArea').style.display = 'block';
+  document.getElementById('successMsg').style.display = 'none';
+  document.getElementById('errorMsg').innerHTML = '';
+  document.getElementById('date').value = '';
+  document.getElementById('startTime').value = '';
+  document.getElementById('field_email').value = '';
+  if (jichikaiConfig) {
+    jichikaiConfig.questionItems.forEach(function(item) {
+      var el = document.getElementById('field_' + item);
+      if (el) el.value = '';
+    });
+  }
+  document.getElementById('btnSubmit').disabled = false;
+  document.getElementById('btnSubmit').textContent = '登録（確定済みとして保存）';
+}
+
+function goBack() {
+  location.href = 'admin.html?jichikai=' + encodeURIComponent(jichikaiId);
+}
+
+init();
+</script>
+</body>
+</html>
