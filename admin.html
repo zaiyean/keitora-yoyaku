@@ -163,8 +163,8 @@
 </div>
 <div class="container">
 
-  <!-- ログイン画面（認証未済の場合） -->
-  <div id="loginBox" class="login-box" style="display:none;">
+  <!-- ログイン画面 -->
+  <div id="loginBox" class="login-box">
     <h2 id="loginTitle">管理者ログイン</h2>
     <div id="loginErrorMsg"></div>
     <input type="password" id="loginPassword" maxlength="4" inputmode="numeric"
@@ -221,22 +221,13 @@ async function callGAS(params) {
 async function init() {
   if (!jichikaiId) { location.href = 'index.html'; return; }
 
-  // sessionStorage から認証確認
-  var auth = null;
-  try { auth = JSON.parse(sessionStorage.getItem('jichiAuth') || 'null'); } catch(e) {}
-
-  if (auth && auth.id === jichikaiId && auth.authenticated) {
-    jichikaiName = auth.name || '';
-    showMain();
-  } else {
-    // 自治会名だけ取得してログイン画面を表示
-    try {
-      const r = await callGAS({ action: 'getConfigById', jichikaiId: jichikaiId });
-      if (r.success) jichikaiName = r.data.name;
-    } catch(e) {}
-    document.getElementById('loginTitle').textContent = (jichikaiName || '自治会') + ' 管理者ログイン';
-    document.getElementById('loginBox').style.display = 'block';
-  }
+  // 自治会名を取得してログインタイトルに表示
+  try {
+    const r = await callGAS({ action: 'getConfigById', jichikaiId: jichikaiId });
+    if (r.success) jichikaiName = r.data.name;
+  } catch(e) {}
+  document.getElementById('loginTitle').textContent = (jichikaiName || '自治会') + ' 管理者ログイン';
+  document.getElementById('loginPassword').focus();
 }
 
 async function doLogin() {
@@ -251,9 +242,6 @@ async function doLogin() {
   try {
     const result = await callGAS({ action: 'checkPassword', jichikaiId: jichikaiId, password: pw });
     if (result.success) {
-      sessionStorage.setItem('jichiAuth', JSON.stringify({
-        id: jichikaiId, name: jichikaiName, authenticated: true
-      }));
       document.getElementById('loginBox').style.display = 'none';
       showMain();
     } else {
