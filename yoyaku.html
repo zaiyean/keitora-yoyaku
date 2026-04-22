@@ -79,7 +79,8 @@
 
   /* 時間帯 */
   .time-section { margin-bottom: 16px; }
-  .time-section h3 { font-size: 15px; margin-bottom: 8px; color: #185FA5; }
+  .time-section h3 { font-size: 15px; margin-bottom: 4px; color: #185FA5; }
+  .time-hint { font-size: 12px; color: #888; margin-bottom: 8px; }
   .time-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .time-btn {
     padding: 12px;
@@ -91,6 +92,7 @@
     cursor: pointer;
     min-height: 44px;
     text-align: center;
+    position: relative;
   }
   .time-btn:disabled {
     border-color: #ccc;
@@ -99,7 +101,17 @@
     cursor: not-allowed;
     background: #f5f5f5;
   }
-  .time-btn.selected { background: #185FA5; color: #fff; }
+  .time-btn.selected {
+    background: #185FA5;
+    color: #fff;
+  }
+  .time-btn.selected::after {
+    content: '✓';
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    font-size: 12px;
+  }
 
   /* 選択確認バッジ */
   .selected-badge {
@@ -199,6 +211,7 @@
 
       <div class="time-section" id="timeSection" style="display:none;">
         <h3 id="timeSectionTitle">時間帯を選択</h3>
+        <p class="time-hint">複数の時間帯を選択できます（隣接する時間帯を選ぶと連続利用になります）</p>
         <div class="time-grid" id="timeGrid"></div>
       </div>
     </div>
@@ -219,7 +232,7 @@
 
   <div class="msg-success" id="successMsg" style="display:none;">
     <h2>申請を受け付けました</h2>
-    <p>仮受付メールをお送りしました（メールアドレス入力時）。<br>管理者の承認後、確定メールをお送りします。</p>
+    <p>仮受付メールをお送りしました。<br>管理者の承認後、確定メールをお送りします。</p>
     <p style="margin-top:12px; font-size:13px; color:#555;" id="receiptDisplay"></p>
   </div>
 
@@ -230,11 +243,14 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbykihXW1722uZGZwcWtnROf
 
 var currentYear, currentMonth;
 var selectedDate = '';
-var selectedTime = '';
+var selectedTimes = []; // 複数選択対応
 var bookedSlots = {};
 var jichikaiConfig = null;
 
 var jichikaiId = new URLSearchParams(location.search).get('jichikai') || '';
+
+// 全スロット順序（時間比較用）
+var ALL_SLOT_STARTS = ['8:00','9:00','10:00','11:00','13:00','14:00','15:00','16:00'];
 
 async function callGAS(params) {
   const res = await fetch(GAS_URL, {
@@ -244,6 +260,27 @@ async function callGAS(params) {
     redirect: 'follow'
   });
   return await res.json();
+}
+
+// 予約範囲をスロット単位に展開（ダブルブッキング表示用）
+function expandBookedRange(startTime, endTime) {
+  var startH = parseInt(startTime.split(':')[0]);
+  var endH = parseInt(endTime.split(':')[0]);
+  return ALL_SLOT_STARTS.filter(function(s) {
+    var h = parseInt(s.split(':')[0]);
+    return h >= startH && h < endH;
+  });
+}
+
+// 選択時間から開始・終了時間を計算
+function getTimeRange(times) {
+  var sorted = times.slice().sort(function(a, b) {
+    return ALL_SLOT_STARTS.indexOf(a) - ALL_SLOT_STARTS.indexOf(b);
+  });
+  var startTime = sorted[0];
+  var lastSlot = sorted[sorted.length - 1];
+  var endTime = (parseInt(lastSlot.split(':')[0]) + 1) + ':00';
+  return { startTime: startTime, endTime: endTime };
 }
 
 async function init() {
@@ -286,7 +323,11 @@ async function loadAndRender() {
       result.data.forEach(function(r) {
         if (r.status === '申請中' || r.status === '確定') {
           if (!bookedSlots[r.date]) bookedSlots[r.date] = [];
-          bookedSlots[r.date].push(r.startTime);
+          // 予約範囲を個別スロットに展開
+          var expanded = expandBookedRange(r.startTime, r.endTime);
+          expanded.forEach(function(s) {
+            if (bookedSlots[r.date].indexOf(s) === -1) bookedSlots[r.date].push(s);
+          });
         }
       });
     }
@@ -306,7 +347,6 @@ function renderCalendar() {
   var daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
   var today = new Date();
   today.setHours(0, 0, 0, 0);
-  var allSlots = ['8:00','9:00','10:00','11:00','13:00','14:00','15:00','16:00'];
 
   for (var i = 0; i < firstDay; i++) {
     var empty = document.createElement('div');
@@ -326,7 +366,7 @@ function renderCalendar() {
 
     var isPast = dateObj < today;
     var slots = bookedSlots[dateStr] || [];
-    var isFullyBooked = allSlots.every(function(s) { return slots.indexOf(s) !== -1; });
+    var isFullyBooked = ALL_SLOT_STARTS.every(function(s) { return slots.indexOf(s) !== -1; });
 
     if (isPast) {
       cell.classList.add('past');
@@ -348,7 +388,7 @@ function renderCalendar() {
 
 function selectDate(dateStr) {
   selectedDate = dateStr;
-  selectedTime = '';
+  selectedTimes = [];
   renderCalendar();
   renderTimeSlots(dateStr);
   document.getElementById('timeSection').style.display = 'block';
@@ -358,8 +398,8 @@ function selectDate(dateStr) {
 
 function renderTimeSlots(dateStr) {
   var allSlots = [
-    {label:'8:00〜9:00', start:'8:00'},
-    {label:'9:00〜10:00', start:'9:00'},
+    {label:'8:00〜9:00',   start:'8:00'},
+    {label:'9:00〜10:00',  start:'9:00'},
     {label:'10:00〜11:00', start:'10:00'},
     {label:'11:00〜12:00', start:'11:00'},
     {label:'13:00〜14:00', start:'13:00'},
@@ -385,6 +425,7 @@ function renderTimeSlots(dateStr) {
 
   allSlots.forEach(function(slot) {
     var btn = document.createElement('button');
+    btn.type = 'button'; // フォーム送信を防止
     btn.className = 'time-btn';
     btn.textContent = slot.label;
     var slotHour = parseInt(slot.start.split(':')[0]);
@@ -398,30 +439,47 @@ function renderTimeSlots(dateStr) {
       btn.textContent = slot.label + '（受付終了）';
     } else {
       btn.addEventListener('click', function() {
-        selectedTime = slot.start;
-        document.querySelectorAll('.time-btn').forEach(function(b) { b.classList.remove('selected'); });
-        btn.classList.add('selected');
-        showForm(dateStr, slot);
+        toggleTimeSlot(slot.start, btn, dateStr);
       });
     }
     grid.appendChild(btn);
   });
 }
 
-function showForm(dateStr, slot) {
+function toggleTimeSlot(startTime, btn, dateStr) {
+  var idx = selectedTimes.indexOf(startTime);
+  if (idx === -1) {
+    selectedTimes.push(startTime);
+    btn.classList.add('selected');
+  } else {
+    selectedTimes.splice(idx, 1);
+    btn.classList.remove('selected');
+  }
+  updateAfterTimeToggle(dateStr);
+}
+
+function updateAfterTimeToggle(dateStr) {
   var parts = dateStr.split('/');
   var dow = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2])).getDay();
   var weekdays = ['日','月','火','水','木','金','土'];
 
+  if (selectedTimes.length === 0) {
+    document.getElementById('selectedBadge').style.display = 'none';
+    document.getElementById('stepForm').style.display = 'none';
+    return;
+  }
+
+  var range = getTimeRange(selectedTimes);
   document.getElementById('selectedBadge').style.display = 'block';
   document.getElementById('selectedBadge').textContent =
-    '選択中：' + dateStr + '（' + weekdays[dow] + '）' + slot.label;
+    '選択中：' + dateStr + '（' + weekdays[dow] + '）' + range.startTime + '〜' + range.endTime;
 
-  // 動的フォーム生成
-  buildDynamicForm();
-
-  document.getElementById('stepForm').style.display = 'block';
-  document.getElementById('errorMsg').innerHTML = '';
+  // フォームが非表示の時だけ構築（表示済みの場合は入力済み内容を保持）
+  if (document.getElementById('stepForm').style.display === 'none') {
+    buildDynamicForm();
+    document.getElementById('stepForm').style.display = 'block';
+    document.getElementById('errorMsg').innerHTML = '';
+  }
 }
 
 function buildDynamicForm() {
@@ -488,13 +546,17 @@ async function submitForm() {
     errors.push('メールアドレスの形式が正しくありません');
   }
 
-  if (!selectedDate || !selectedTime) errors.push('日時を選択してください');
+  if (!selectedDate || selectedTimes.length === 0) {
+    errors.push('日時を選択してください');
+  }
 
   if (errors.length > 0) {
     document.getElementById('errorMsg').innerHTML =
       '<div class="msg-error">' + errors.join('<br>') + '</div>';
     return;
   }
+
+  var range = getTimeRange(selectedTimes);
 
   document.getElementById('btnSubmit').disabled = true;
   document.getElementById('btnSubmit').textContent = '送信中...';
@@ -504,7 +566,8 @@ async function submitForm() {
       action: 'submit',
       jichikaiId: jichikaiId,
       date: selectedDate,
-      startTime: selectedTime,
+      startTime: range.startTime,
+      endTime: range.endTime,
       email: email,
       answers: answers
     });
@@ -532,7 +595,7 @@ async function submitForm() {
 function prevMonth() {
   currentMonth--;
   if (currentMonth < 1) { currentMonth = 12; currentYear--; }
-  selectedDate = ''; selectedTime = '';
+  selectedDate = ''; selectedTimes = [];
   document.getElementById('timeSection').style.display = 'none';
   document.getElementById('stepForm').style.display = 'none';
   document.getElementById('selectedBadge').style.display = 'none';
@@ -542,7 +605,7 @@ function prevMonth() {
 function nextMonth() {
   currentMonth++;
   if (currentMonth > 12) { currentMonth = 1; currentYear++; }
-  selectedDate = ''; selectedTime = '';
+  selectedDate = ''; selectedTimes = [];
   document.getElementById('timeSection').style.display = 'none';
   document.getElementById('stepForm').style.display = 'none';
   document.getElementById('selectedBadge').style.display = 'none';

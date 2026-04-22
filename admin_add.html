@@ -123,24 +123,41 @@
 
     <div id="errorMsg"></div>
 
-    <!-- 利用日・開始時間 -->
+    <!-- 利用日 -->
+    <div class="form-group">
+      <label>利用日 <span style="color:red">*</span></label>
+      <input type="date" id="date">
+    </div>
+
+    <!-- 開始時間・終了時間 -->
     <div class="form-row">
-      <div class="form-group">
-        <label>利用日 <span style="color:red">*</span></label>
-        <input type="date" id="date">
-      </div>
       <div class="form-group">
         <label>開始時間 <span style="color:red">*</span></label>
         <select id="startTime">
           <option value="">選択</option>
-          <option value="8:00">8:00〜9:00</option>
-          <option value="9:00">9:00〜10:00</option>
-          <option value="10:00">10:00〜11:00</option>
-          <option value="11:00">11:00〜12:00</option>
-          <option value="13:00">13:00〜14:00</option>
-          <option value="14:00">14:00〜15:00</option>
-          <option value="15:00">15:00〜16:00</option>
-          <option value="16:00">16:00〜17:00</option>
+          <option value="8:00">8:00</option>
+          <option value="9:00">9:00</option>
+          <option value="10:00">10:00</option>
+          <option value="11:00">11:00</option>
+          <option value="13:00">13:00</option>
+          <option value="14:00">14:00</option>
+          <option value="15:00">15:00</option>
+          <option value="16:00">16:00</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>終了時間 <span style="color:red">*</span></label>
+        <select id="endTime">
+          <option value="">選択</option>
+          <option value="9:00">9:00</option>
+          <option value="10:00">10:00</option>
+          <option value="11:00">11:00</option>
+          <option value="12:00">12:00</option>
+          <option value="13:00">13:00</option>
+          <option value="14:00">14:00</option>
+          <option value="15:00">15:00</option>
+          <option value="16:00">16:00</option>
+          <option value="17:00">17:00</option>
         </select>
       </div>
     </div>
@@ -243,10 +260,20 @@ function buildDynamicForm() {
 async function submitForm() {
   var date = document.getElementById('date').value;
   var startTime = document.getElementById('startTime').value;
+  var endTime = document.getElementById('endTime').value;
 
   var errors = [];
   if (!date) errors.push('利用日を入力してください');
   if (!startTime) errors.push('開始時間を選択してください');
+  if (!endTime) errors.push('終了時間を選択してください');
+
+  if (startTime && endTime) {
+    var startH = parseInt(startTime.split(':')[0]);
+    var endH = parseInt(endTime.split(':')[0]);
+    if (endH <= startH) {
+      errors.push('終了時間は開始時間より後の時間を選択してください');
+    }
+  }
 
   var answers = {};
   if (jichikaiConfig) {
@@ -287,6 +314,7 @@ async function submitForm() {
       jichikaiId: jichikaiId,
       date: dateFormatted,
       startTime: startTime,
+      endTime: endTime,
       email: email,
       answers: answers
     });
@@ -315,6 +343,7 @@ function resetForm() {
   document.getElementById('errorMsg').innerHTML = '';
   document.getElementById('date').value = '';
   document.getElementById('startTime').value = '';
+  document.getElementById('endTime').value = '';
   document.getElementById('field_email').value = '';
   if (jichikaiConfig) {
     jichikaiConfig.questionItems.forEach(function(item) {
