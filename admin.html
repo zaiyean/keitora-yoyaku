@@ -408,18 +408,19 @@ function showDetail(dateStr) {
 
     var info = document.createElement('div');
     info.className = 'card-info';
-    var infoHTML =
-      '<div class="info-row"><span class="label">氏名</span><span>' + (r.name || '') + '</span></div>'
-      + '<div class="info-row"><span class="label">電話</span><span>' + (r.phone || '') + '</span></div>'
-      + '<div class="info-row"><span class="label">用途</span><span>' + (r.purpose || '') + '</span></div>';
+    var infoHTML = '';
 
-    // 動的追加項目
+    // 追加項目（町内会・組など）を先頭に表示
     if (r.extra) {
       Object.keys(r.extra).forEach(function(key) {
         infoHTML += '<div class="info-row"><span class="label">' + key + '</span><span>' + (r.extra[key] || '') + '</span></div>';
       });
     }
-    infoHTML += '<div class="info-row"><span class="label">受付番号</span><span>' + (r.receiptNo || '') + '</span></div>';
+    infoHTML +=
+      '<div class="info-row"><span class="label">氏名</span><span>' + (r.name || '') + '</span></div>'
+      + '<div class="info-row"><span class="label">電話</span><span>' + (r.phone || '') + '</span></div>'
+      + '<div class="info-row"><span class="label">用途</span><span>' + (r.purpose || '') + '</span></div>'
+      + '<div class="info-row"><span class="label">受付番号</span><span>' + (r.receiptNo || '') + '</span></div>';
     info.innerHTML = infoHTML;
     card.appendChild(info);
 

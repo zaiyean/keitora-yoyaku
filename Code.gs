@@ -245,12 +245,20 @@ function sendAdminNotify(config, params, receiptNo, endTime) {
   var youbi = ['日','月','火','水','木','金','土'][dateObj.getDay()];
   var adminUrl = HTML_BASE_URL + '/admin.html?jichikai=' + encodeURIComponent(config.id);
 
+  var stdSet = ['氏名', '電話番号', '用途'];
+  var extraItems = config.questionItems.filter(function(item) { return stdSet.indexOf(item) === -1; });
+
   var body = '新規予約申請が届きました。\n\n'
-    + '① 受付番号：' + receiptNo + '\n'
-    + '② 利用日時：' + params.date + '（' + youbi + '）' + params.startTime + '〜' + endTime + '\n'
-    + '③ 氏名：' + (answers['氏名'] || '') + '\n'
-    + '④ 用途：' + (answers['用途'] || '') + '\n'
-    + '⑤ 電話番号：' + (answers['電話番号'] || '') + '\n\n'
+    + '利用日時：' + params.date + '（' + youbi + '）' + params.startTime + '〜' + endTime + '\n';
+
+  extraItems.forEach(function(item) {
+    body += item + '：' + (answers[item] || '') + '\n';
+  });
+
+  body += '氏名：' + (answers['氏名'] || '') + '\n'
+    + '電話番号：' + (answers['電話番号'] || '') + '\n'
+    + '用途：' + (answers['用途'] || '') + '\n'
+    + '受付番号：' + receiptNo + '\n\n'
     + '管理者ページ（承認・却下はこちら）:\n' + adminUrl;
 
   GmailApp.sendEmail(adminEmail, '【新規申請】' + config.name + '　軽トラック予約申請が入りました', body);
